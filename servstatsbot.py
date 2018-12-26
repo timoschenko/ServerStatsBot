@@ -12,7 +12,7 @@ import time
 # import threading
 # import random
 from telegram import ChatAction, ReplyMarkup
-from telegram.ext import Filters, Updater
+from telegram.ext import Filters, Updater, MessageHandler
 
 STRINGS = {
     'button_stop': 'Stop',
@@ -26,7 +26,7 @@ STRINGS = {
     'reply_set_threshold_done': 'All set!',
     'reply_set_threshold_error': 'Please send a proper numeric value below 100.',
     'graph_title': 'Memory Usage Graph',
-    'graph_x': 'Last %.2f hours',
+    'graph_x': 'Last {:.2f} hours',
     'graph_y': '% Used',
     'graph_threshold': 'Threshold: {} %',
     'stats_onilne_hours': 'Online for: {:.1f} Hours',
@@ -39,7 +39,7 @@ STRINGS = {
 
 memorythreshold = 85  # If memory usage more this %
 poll = 300  # seconds
-temp_graph_path = '/tmp/graph.png'
+temp_graph_path = 'graph.png'
 
 shellexecution = []
 timelist = []
@@ -176,9 +176,13 @@ def on_message(bot, upd):
 
 
 TOKEN = telegrambot
+if proxy:
+    updater = Updater(TOKEN, request_kwargs=proxy)
+else:
+    updater = Updater(TOKEN)
 
-updater = Updater(TOKEN, request_kwargs=proxy) if proxy else updater = Updater(TOKEN)
-updater.dispatcher.add_handler(on_message, Filters.text)
+on_message_handler = MessageHandler(Filters.text | Filters.command, on_message)
+updater.dispatcher.add_handler(on_message_handler)
 updater.start_polling()
 tr = 0
 xx = 0
@@ -205,7 +209,7 @@ while 1:
             graphend = datetime.now()
             tmperiod = STRINGS['graph_x'].format((graphend - graphstart).total_seconds() / 3600)
             for adminid in adminchatid:
-                updater.bot.send_message(adminid, "{}\n{}".format(STRINGS['alert_low_memory'], memavail)
+                updater.bot.send_message(adminid, "{}\n{}".format(STRINGS['alert_low_memory'], memavail))
                 updater.bot.send_photo(adminid, plotmemgraph(memlist, xaxis, tmperiod))
     time.sleep(10)  # 10 seconds
     tr += 10
