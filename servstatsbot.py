@@ -40,6 +40,7 @@ STRINGS = {
 
 memorythreshold = 85  # If memory usage more this %
 poll = 300  # seconds
+temp_graph_path = '/tmp/graph.png'
 
 shellexecution = []
 timelist = []
@@ -72,9 +73,9 @@ def plotmemgraph(memlist, xaxis, tmperiod):
         memthresholdarr.append(memorythreshold)
     plt.plot(xaxis, memlist, 'b-', xaxis, memthresholdarr, 'r--')
     plt.axis([0, len(xaxis)-1, 0, 100])
-    plt.savefig('/tmp/graph.png')
+    plt.savefig(temp_graph_path)
     plt.close()
-    f = open('/tmp/graph.png', 'rb')  # some file on local disk
+    f = open(temp_graph_path, 'rb')  # some file on local disk
     return f
 
 
