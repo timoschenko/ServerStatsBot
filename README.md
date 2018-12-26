@@ -30,7 +30,7 @@ Example graph sent by bot: [Gif](http://i.imgur.com/anX7rJR.gifv)
 ## Requirements 
 
 * Python 3+
-* [Telepot](https://github.com/nickoala/telepot)
+* [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot)
 * [Psutil](https://github.com/giampaolo/psutil)
     * Make sure to install it for Python 3+
     * In order to make sure that `pip` installs packages for the 3+ version:

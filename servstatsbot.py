@@ -11,10 +11,9 @@ import collections
 import time
 # import threading
 # import random
-import telepot
-# from telepot.namedtuple import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardHide, ForceReply
-# from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton
-# from telepot.namedtuple import InlineQueryResultArticle, InlineQueryResultPhoto, InputTextMessageContent
+import telegram
+from telegram import ChatAction, ReplyMarkup
+from telegram.ext import Filters, Updater
 
 
 
@@ -58,111 +57,108 @@ def plotmemgraph(memlist, xaxis, tmperiod):
     return f
 
 
-class YourBot(telepot.Bot):
-    def __init__(self, *args, **kwargs):
-        super(YourBot, self).__init__(*args, **kwargs)
-        self._answerer = telepot.helper.Answerer(self)
-        self._message_with_inline_keyboard = None
+def on_message(bot, upd):
+    chat_id = upd.message.chat.id
+    message = upd.message.text
+    print('Message from {}:\n{}\n'.format(chat_id, message))
 
-    def on_chat_message(self, msg):
-        content_type, chat_type, chat_id = telepot.glance(msg)
-        # Do your stuff according to `content_type` ...
-        print("Your chat_id:" + str(chat_id)) # this will tell you your chat_id
-        if chat_id in adminchatid:  # Store adminchatid variable in tokens.py
-            if content_type == 'text':
-                if msg['text'] == '/stats' and chat_id not in shellexecution:
-                    bot.sendChatAction(chat_id, 'typing')
-                    memory = psutil.virtual_memory()
-                    disk = psutil.disk_usage('/')
-                    boottime = datetime.fromtimestamp(psutil.boot_time())
-                    now = datetime.now()
-                    timedif = "Online for: %.1f Hours" % (((now - boottime).total_seconds()) / 3600)
-                    memtotal = "Total memory: %.2f GB " % (memory.total / 1000000000)
-                    memavail = "Available memory: %.2f GB" % (memory.available / 1000000000)
-                    memuseperc = "Used memory: " + str(memory.percent) + " %"
-                    diskused = "Disk used: " + str(disk.percent) + " %"
-                    pids = psutil.pids()
-                    pidsreply = ''
-                    procs = {}
-                    for pid in pids:
-                        p = psutil.Process(pid)
-                        try:
-                            pmem = p.memory_percent()
-                            if pmem > 0.5:
-                                if p.name() in procs:
-                                    procs[p.name()] += pmem
-                                else:
-                                    procs[p.name()] = pmem
-                        except:
-                            print("Hm")
-                    sortedprocs = sorted(procs.items(), key=operator.itemgetter(1), reverse=True)
-                    for proc in sortedprocs:
-                        pidsreply += proc[0] + " " + ("%.2f" % proc[1]) + " %\n"
-                    reply = timedif + "\n" + \
-                            memtotal + "\n" + \
-                            memavail + "\n" + \
-                            memuseperc + "\n" + \
-                            diskused + "\n\n" + \
-                            pidsreply
-                    bot.sendMessage(chat_id, reply, disable_web_page_preview=True)
-                elif msg['text'] == "Stop":
-                    clearall(chat_id)
-                    bot.sendMessage(chat_id, "All operations stopped.", reply_markup=hide_keyboard)
-                elif msg['text'] == '/setpoll' and chat_id not in setpolling:
-                    bot.sendChatAction(chat_id, 'typing')
-                    setpolling.append(chat_id)
-                    bot.sendMessage(chat_id, "Send me a new polling interval in seconds? (higher than 10)", reply_markup=stopmarkup)
-                elif chat_id in setpolling:
-                    bot.sendChatAction(chat_id, 'typing')
-                    try:
-                        global poll
-                        poll = int(msg['text'])
-                        if poll > 10:
-                            bot.sendMessage(chat_id, "All set!")
-                            clearall(chat_id)
-                        else:
-                            1/0
-                    except:
-                        bot.sendMessage(chat_id, "Please send a proper numeric value higher than 10.")
-                elif msg['text'] == "/shell" and chat_id not in shellexecution:
-                    bot.sendMessage(chat_id, "Send me a shell command to execute", reply_markup=stopmarkup)
-                    shellexecution.append(chat_id)
-                elif msg['text'] == "/setmem" and chat_id not in settingmemth:
-                    bot.sendChatAction(chat_id, 'typing')
-                    settingmemth.append(chat_id)
-                    bot.sendMessage(chat_id, "Send me a new memory threshold to monitor?", reply_markup=stopmarkup)
-                elif chat_id in settingmemth:
-                    bot.sendChatAction(chat_id, 'typing')
-                    try:
-                        global memorythreshold
-                        memorythreshold = int(msg['text'])
-                        if memorythreshold < 100:
-                            bot.sendMessage(chat_id, "All set!")
-                            clearall(chat_id)
-                        else:
-                            1/0
-                    except:
-                        bot.sendMessage(chat_id, "Please send a proper numeric value below 100.")
+    if chat_id not in adminchatid:
+        return
 
-                elif chat_id in shellexecution:
-                    bot.sendChatAction(chat_id, 'typing')
-                    p = Popen(msg['text'], shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT, close_fds=True)
-                    output = p.stdout.read()
-                    if output != b'':
-                        bot.sendMessage(chat_id, output, disable_web_page_preview=True)
+    if message == '/stats' and chat_id not in shellexecution:
+        bot.send_chat_action(chat_id, ChatAction.TYPING)
+        memory = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        boottime = datetime.fromtimestamp(psutil.boot_time())
+        now = datetime.now()
+        timedif = "Online for: %.1f Hours" % (((now - boottime).total_seconds()) / 3600)
+        memtotal = "Total memory: %.2f GB " % (memory.total / 1000000000)
+        memavail = "Available memory: %.2f GB" % (memory.available / 1000000000)
+        memuseperc = "Used memory: " + str(memory.percent) + " %"
+        diskused = "Disk used: " + str(disk.percent) + " %"
+        pids = psutil.pids()
+        pidsreply = ''
+        procs = {}
+        for pid in pids:
+            p = psutil.Process(pid)
+            try:
+                pmem = p.memory_percent()
+                if pmem > 0.5:
+                    if p.name() in procs:
+                        procs[p.name()] += pmem
                     else:
-                        bot.sendMessage(chat_id, "No output.", disable_web_page_preview=True)
-                elif msg['text'] == '/memgraph':
-                    bot.sendChatAction(chat_id, 'typing')
-                    tmperiod = "Last %.2f hours" % ((datetime.now() - graphstart).total_seconds() / 3600)
-                    bot.sendPhoto(chat_id, plotmemgraph(memlist, xaxis, tmperiod))
+                        procs[p.name()] = pmem
+            except:
+                print("Hm")
+        sortedprocs = sorted(procs.items(), key=operator.itemgetter(1), reverse=True)
+        for proc in sortedprocs:
+            pidsreply += proc[0] + " " + ("%.2f" % proc[1]) + " %\n"
+        reply = timedif + "\n" + \
+                memtotal + "\n" + \
+                memavail + "\n" + \
+                memuseperc + "\n" + \
+                diskused + "\n\n" + \
+                pidsreply
+        bot.send_message(chat_id, reply, disable_web_page_preview=True)
+    elif message == "Stop":
+        clearall(chat_id)
+        bot.send_message(chat_id, "All operations stopped.", reply_markup=hide_keyboard)
+    elif message == '/setpoll' and chat_id not in setpolling:
+        bot.send_chat_action(chat_id, ChatAction.TYPING)
+        setpolling.append(chat_id)
+        bot.send_message(chat_id, "Send me a new polling interval in seconds? (higher than 10)", reply_markup=stopmarkup)
+    elif chat_id in setpolling:
+        bot.send_chat_action(chat_id, ChatAction.TYPING)
+        try:
+            global poll
+            poll = int(message)
+            if poll > 10:
+                bot.send_message(chat_id, "All set!")
+                clearall(chat_id)
+            else:
+                1/0
+        except:
+            bot.send_message(chat_id, "Please send a proper numeric value higher than 10.")
+    elif message == "/shell" and chat_id not in shellexecution:
+        bot.send_message(chat_id, "Send me a shell command to execute", reply_markup=stopmarkup)
+        shellexecution.append(chat_id)
+    elif message == "/setmem" and chat_id not in settingmemth:
+        bot.send_chat_action(chat_id, ChatAction.TYPING)
+        settingmemth.append(chat_id)
+        bot.send_message(chat_id, "Send me a new memory threshold to monitor?", reply_markup=stopmarkup)
+    elif chat_id in settingmemth:
+        bot.send_chat_action(chat_id, ChatAction.TYPING)
+        try:
+            global memorythreshold
+            memorythreshold = int(message)
+            if memorythreshold < 100:
+                bot.send_message(chat_id, "All set!")
+                clearall(chat_id)
+            else:
+                1/0
+        except:
+            bot.send_message(chat_id, "Please send a proper numeric value below 100.")
+
+    elif chat_id in shellexecution:
+        bot.send_chat_action(chat_id, ChatAction.TYPING)
+        p = Popen(message, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT, close_fds=True)
+        output = p.stdout.read()
+        if output != b'':
+            bot.send_message(chat_id, output, disable_web_page_preview=True)
+        else:
+            bot.send_message(chat_id, "No output.", disable_web_page_preview=True)
+    elif message == '/memgraph':
+        bot.send_chat_action(chat_id, ChatAction.TYPING)
+        tmperiod = "Last %.2f hours" % ((datetime.now() - graphstart).total_seconds() / 3600)
+        bot.sendPhoto(chat_id, plotmemgraph(memlist, xaxis, tmperiod))
 
 
 
 TOKEN = telegrambot
 
-bot = YourBot(TOKEN)
-bot.message_loop()
+updater = Updater(TOKEN)
+updater.dispatcher.add_handler(on_message, Filters.text)
+updater.start_polling()
 tr = 0
 xx = 0
 # Keep the program running.
@@ -188,7 +184,7 @@ while 1:
             graphend = datetime.now()
             tmperiod = "Last %.2f hours" % ((graphend - graphstart).total_seconds() / 3600)
             for adminid in adminchatid:
-                bot.sendMessage(adminid, "CRITICAL! LOW MEMORY!\n" + memavail)
-                bot.sendPhoto(adminid, plotmemgraph(memlist, xaxis, tmperiod))
+                updater.bot.send_message(adminid, "CRITICAL! LOW MEMORY!\n" + memavail)
+                updater.bot.send_photo(adminid, plotmemgraph(memlist, xaxis, tmperiod))
     time.sleep(10)  # 10 seconds
     tr += 10
