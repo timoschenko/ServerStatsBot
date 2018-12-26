@@ -48,7 +48,13 @@ Example graph sent by bot: [Gif](http://i.imgur.com/anX7rJR.gifv)
        * It's added to the `.gitignore` so you don't commit your own (and I don't commit mine:)
     * In that file put a string variable `telegrambot` which equals your key
        * For example: `telegrambot = "000000000:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"`
-   
+
+## Proxy support
+
+Most of this covered in [python-telegram-bot wiki](https://github.com/python-telegram-bot/python-telegram-bot/wiki/Working-Behind-a-Proxy). Only difference is that you need to set `proxy` option in `tokens.py` instead of `request_kwargs` in `Updater`.
+
+If you don't need proxy support, just set `proxy` in your `tokens.py` to `False`.
+
 ## Running the bot
 
 `python3 servstatsbot.py`

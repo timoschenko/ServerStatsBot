@@ -11,7 +11,6 @@ import collections
 import time
 # import threading
 # import random
-import telegram
 from telegram import ChatAction, ReplyMarkup
 from telegram.ext import Filters, Updater
 
@@ -178,7 +177,7 @@ def on_message(bot, upd):
 
 TOKEN = telegrambot
 
-updater = Updater(TOKEN)
+updater = Updater(TOKEN, request_kwargs=proxy) if proxy else updater = Updater(TOKEN)
 updater.dispatcher.add_handler(on_message, Filters.text)
 updater.start_polling()
 tr = 0
