@@ -134,7 +134,7 @@ def on_message(bot, upd):
             global poll
             poll = int(message)
             if poll > 10:
-                bot.send_message(chat_id, STRINGS['reply_set_poll_interval_done'])
+                bot.send_message(chat_id, STRINGS['reply_set_poll_interval_done'], reply_markup=hide_keyboard)
                 clearall(chat_id)
             else:
                 1/0
@@ -153,7 +153,7 @@ def on_message(bot, upd):
             global memorythreshold
             memorythreshold = int(message)
             if memorythreshold < 100:
-                bot.send_message(chat_id, STRINGS['reply_set_threshold_done'])
+                bot.send_message(chat_id, STRINGS['reply_set_threshold_done'], reply_markup=hide_keyboard)
                 clearall(chat_id)
             else:
                 1/0
