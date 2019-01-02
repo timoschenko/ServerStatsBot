@@ -1,8 +1,17 @@
 # A token you get from the Telegram's botfather
 telegrambot = '9999999:6666aaaaaa666666a6aaa'
 
-# A chat_id of your client
-adminchatid = [99999999]
-
 # Proxy for request. Leave False if you don't need any.
 proxy = False
+
+# Security settings
+#
+# A chat_id of your client
+# NOTE: If you don't known yours chat_id, just run the bot
+#       and send the /start command.
+adminchatid = [99999999]
+
+# Allows indirect shell access via the bot
+# Set to True if you brave enoght
+enable_shell_command = False
+
