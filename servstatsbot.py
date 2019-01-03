@@ -11,13 +11,11 @@ import traceback
 
 
 try:
-    from telegram import ChatAction, ReplyMarkup
+    from telegram import ChatAction, ReplyMarkup, ParseMode
     from telegram.ext import Filters, Updater, MessageHandler
 except ImportError:
     print('telegram module is not found!')
     print('Use the command below to install it:')
-    print('   root $ apt install python3-psutil')
-    print('or')
     print('   root $ pip3 install python-telegram-bot')
     print("\nCan't continue without the module! Exit..")
     exit(3)
@@ -98,10 +96,12 @@ settingmemth = []
 setpolling = []
 graphstart = datetime.now()
 
-default_kwargs = {'parse_mode': telegram.MARKDOWN, 'disable_web_page_preview': True}
+default_kwargs = {'parse_mode': ParseMode.MARKDOWN, 'disable_web_page_preview': True}
 stopmarkup = {'keyboard': [[STRINGS['button_stop']]]}
 hide_keyboard = {'hide_keyboard': True}
 help_markup = {'keyboard': [['/stats', '/memgraph']]}
+
+spamguard = 0
 
 def clearall(chat_id):
     if chat_id in shellexecution:
@@ -137,9 +137,9 @@ def on_message(bot, upd):
     print('Message from the {} id: "{}"'.format(chat_id, message))
 
     # TODO: Move to the command_handler function
+    global spamguard
     now = time.time()
     if message in ['/start', '/help'] and (now - spamguard) > 30:
-        global spamguard
         spamguard = now
 
         bot.send_chat_action(chat_id, ChatAction.TYPING)
@@ -276,7 +276,6 @@ else:
 on_message_handler = MessageHandler(Filters.text | Filters.command, on_message)
 updater.dispatcher.add_handler(on_message_handler)
 updater.start_polling()
-spamguard = 0
 lastpoll = 0
 xx = 0
 # Keep the program running.
