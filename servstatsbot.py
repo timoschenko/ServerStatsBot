@@ -61,8 +61,8 @@ except ImportError:
 STRINGS = {
     'button_stop': 'Stop',
     'error': 'Something went wrong',
-    'reply_chat_id': "Hello the stranger! Your id is {chat_id}. Please send the id to bot's administration",
-    'reply_help': 'Hello! Your id is {chat_id}.',
+    'reply_chat_id': "Hello the stranger! Your id is `{chat_id}`. Please send the id to bot's administration",
+    'reply_help': 'Hello! Your id is `{chat_id}`.',
     'reply_stopped': 'Return to normal mode',
     'reply_set_poll_interval': 'Send me a new polling interval in seconds? (higher than 10)',
     'reply_set_poll_interval_done': 'All set!',
@@ -76,11 +76,11 @@ STRINGS = {
     'graph_x': 'Last {:.2f} hours',
     'graph_y': '% Used',
     'graph_threshold': 'Threshold: {}%',
-    'stats_onilne_hours': 'Online for: {:.1f} Hours',
-    'stats_memory_total': 'Total memory: {:.2f} GB ',
-    'stats_memory_available': 'Available memory: {:.2f} GB',
-    'stats_memory_used': 'Used memory: {}%',
-    'stats_disk_used': 'Disk used: {}%',
+    'stats_onilne_hours': 'Uptime is _{:.1f}_ Hours',
+    'stats_memory_total': 'Total memory: `_{:.2f} GB_',
+    'stats_memory_available': 'Available memory: _{:.2f} GB_',
+    'stats_memory_used': 'Used memory: _{}%_',
+    'stats_disk_used': 'Disk used: _{}%_',
     'alert_low_memory': 'CRITICAL! LOW MEMORY!'
 }
 
@@ -248,7 +248,7 @@ def command_handler(bot, upd, chat_id, message):
             except Exception:
                 traceback.print_exc()
         sortedprocs = sorted(procs.items(), key=operator.itemgetter(1), reverse=True)
-        pidsreply = '\n'.join("%s %.2f%%" % (proc[0], proc[1]) for proc in sortedprocs)
+        pidsreply = '\n'.join("`%s` _%.2f%%_" % (proc[0], proc[1]) for proc in sortedprocs)
         reply = '\n'.join((timedif,
             memtotal,
             memavail,
