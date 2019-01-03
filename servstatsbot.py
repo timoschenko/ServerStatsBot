@@ -59,6 +59,8 @@ except ImportError:
 
 
 STRINGS = {
+    'alert_bootup': "_I'm up!_",
+    'alert_shutdown': "_I'm shutting down!_",
     'button_stop': 'Stop',
     'error': 'Something went wrong',
     'reply_chat_id': "Hello the stranger! Your id is `{chat_id}`. Please send the id to bot's administration",
@@ -77,7 +79,7 @@ STRINGS = {
     'graph_y': '% Used',
     'graph_threshold': 'Threshold: {}%',
     'stats_onilne_hours': 'Uptime is _{:.1f}_ Hours',
-    'stats_memory_total': 'Total memory: `_{:.2f} GB_',
+    'stats_memory_total': 'Total memory: _{:.2f} GB_',
     'stats_memory_available': 'Available memory: _{:.2f} GB_',
     'stats_memory_used': 'Used memory: _{}%_',
     'stats_disk_used': 'Disk used: _{}%_',
@@ -99,7 +101,7 @@ graphstart = datetime.now()
 default_kwargs = {'parse_mode': ParseMode.MARKDOWN, 'disable_web_page_preview': True}
 stopmarkup = {'keyboard': [[STRINGS['button_stop']]]}
 hide_keyboard = {'hide_keyboard': True}
-help_markup = {'keyboard': [['/stats', '/memgraph']]}
+help_markup = {'keyboard': [['/stats'], ['/memgraph']]}
 
 spamguard = 0
 
@@ -256,8 +258,7 @@ def command_handler(bot, upd, chat_id, message):
             diskused,
             '\n',
             pidsreply,))
-
-        bot.send_message(chat_id, reply, **default_kwargs)
+        bot.send_message(chat_id, reply.strip(), **default_kwargs)
     elif message == '/memgraph' and matplotlib is not None:
         bot.send_chat_action(chat_id, ChatAction.TYPING)
         tmperiod = STRINGS['graph_x'].format((datetime.now() - graphstart).total_seconds() / 3600)
@@ -267,6 +268,7 @@ def command_handler(bot, upd, chat_id, message):
 
 assert os.geteuid() != 0, 'Security break! Do not run the bot as root/super user!'
 
+print('> Connect to Telegram servers..')
 TOKEN = telegrambot
 if proxy:
     updater = Updater(TOKEN, request_kwargs=proxy)
@@ -278,39 +280,53 @@ updater.dispatcher.add_handler(on_message_handler)
 updater.start_polling()
 lastpoll = 0
 xx = 0
-# Keep the program running.
-while True:
-    timenow = time.time()
-    if (timenow - lastpoll) >= poll:
-        try:
-            memck = psutil.virtual_memory()
-            mempercent = memck.percent
-            if len(memlist) > 300:
-                memq = collections.deque(memlist)
-                memq.append(mempercent)
-                memq.popleft()
-                memlist = memq
-                memlist = list(memlist)
-            else:
-                xaxis.append(xx)
-                xx += 1
-                memlist.append(mempercent)
-            memfree = memck.available / 1000000
-            if mempercent > memorythreshold:
-                memavail = STRINGS['stats_memory_available'].format(memck.available / 1000000000)
-                graphend = datetime.now()
-                tmperiod = STRINGS['graph_x'].format((graphend - graphstart).total_seconds() / 3600)
-                for adminid in adminchatid:
-                    updater.bot.send_message(adminid, "{}\n{}".format(STRINGS['alert_low_memory'], memavail),
-                            **default_kwargs)
+print('> Ready to work!')
+for adminid in adminchatid:
+    updater.bot.send_message(adminid, STRINGS['alert_bootup'], **default_kwargs)
 
-                if matplotlib is not None:
-                    with plotmemgraph(memlist, xaxis, tmperiod) as photo:
-                        for adminid in adminchatid:
-                            updater.bot.send_photo(adminid, photo)
-        except Exception:
-            traceback.print_exc()
-        finally:
-            lastpoll = timenow
+try:
+    # Keep the program running.
+    while True:
+        timenow = time.time()
+        if (timenow - lastpoll) >= poll:
+            try:
+                memck = psutil.virtual_memory()
+                mempercent = memck.percent
+                if len(memlist) > 300:
+                    memq = collections.deque(memlist)
+                    memq.append(mempercent)
+                    memq.popleft()
+                    memlist = memq
+                    memlist = list(memlist)
+                else:
+                    xaxis.append(xx)
+                    xx += 1
+                    memlist.append(mempercent)
+                memfree = memck.available / 1000000
+                if mempercent > memorythreshold:
+                    memavail = STRINGS['stats_memory_available'].format(memck.available / 1000000000)
+                    graphend = datetime.now()
+                    tmperiod = STRINGS['graph_x'].format((graphend - graphstart).total_seconds() / 3600)
+                    for adminid in adminchatid:
+                        updater.bot.send_message(adminid, "{}\n{}".format(STRINGS['alert_low_memory'], memavail),
+                                **default_kwargs)
 
-    time.sleep(10)
+                    if matplotlib is not None:
+                        with plotmemgraph(memlist, xaxis, tmperiod) as photo:
+                            for adminid in adminchatid:
+                                updater.bot.send_photo(adminid, photo)
+            except Exception:
+                traceback.print_exc()
+            finally:
+                lastpoll = timenow
+
+        time.sleep(10)
+except (SystemExit, KeyboardInterrupt,):
+    print('> Catch Exit')
+finally:
+    try:
+        for adminid in adminchatid:
+            updater.bot.send_message(adminid, STRINGS['alert_shutdown'], **default_kwargs)
+    finally:
+        print('> Stop polling...')
+        updater.stop()
