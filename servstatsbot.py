@@ -72,6 +72,9 @@ STRINGS = {
     'reply_set_poll_interval': 'Send me a new polling interval in seconds? (higher than 10)',
     'reply_set_poll_interval_done': 'All set!',
     'reply_set_poll_interval_error': 'Please send a proper numeric value higher than 10.',
+    'reply_settings': 'Current configuration:\n\n'
+                      + 'RAM threshold is `{memthreshold}%`\n'
+                      + 'Alert update timeout is `{alertupdate}` second(s)',
     'reply_shell_cmd': 'Send me a shell command to execute',
     'reply_shell_cmd_empty': 'No output.',
     'reply_set_threshold': 'Send me a new memory threshold to monitor?',
@@ -101,6 +104,9 @@ RAM_HISTORY = []
 RAM_THRESHOLD = 85  # If memory usage more this %
 
 DEFAULT_KWARGS = {'parse_mode': ParseMode.MARKDOWN, 'disable_web_page_preview': True}
+
+MARKUP_MAIN = {'keyboard': [['/stats', '/memgraph'], ['/settings']]}
+MARKUP_SETTINGS = {'keyboard': [['/setpoll', '/setmem'], [STRINGS['button_stop']]]}
 MARKUP_STOP = {'keyboard': [[STRINGS['button_stop']]]}
 MARKUP_HIDEKEYBOARD = {'hide_keyboard': True}
 
@@ -154,6 +160,8 @@ def on_message(bot, upd):
     message = upd.message.text
     print('Message from the {} id: "{}"'.format(chat_id, message))
 
+    isadmin = chat_id in adminchatid
+
     # TODO: Move to the command_handler function
     global LAST_SPAM_COMMAND
     now = time.time()
@@ -162,14 +170,17 @@ def on_message(bot, upd):
 
         bot.send_chat_action(chat_id, ChatAction.TYPING)
         replymsg = STRINGS['reply_hello_id'].format(chat_id=chat_id)
-        if chat_id not in adminchatid:
+        if not isadmin:
             replymsg += '\n'
             replymsg += STRINGS['reply_hello_access']
 
-        bot.send_message(chat_id, replymsg, **DEFAULT_KWARGS)
+        bot.send_message(chat_id,
+                         replymsg,
+                         reply_markup=MARKUP_MAIN if isadmin else MARKUP_HIDEKEYBOARD,
+                         **DEFAULT_KWARGS)
         return
 
-    if chat_id not in adminchatid:
+    if not isadmin:
         return
 
     try:
@@ -190,7 +201,7 @@ def command_handler(bot, upd, chat_id, message):  # TODO: Too complex
         clearall(chat_id)
         bot.send_message(chat_id,
                          STRINGS['reply_stopped'],
-                         reply_markup=MARKUP_HIDEKEYBOARD,
+                         reply_markup=MARKUP_MAIN,
                          **DEFAULT_KWARGS)
 
     # NOTE: Indirect shell access
@@ -306,6 +317,12 @@ def command_handler(bot, upd, chat_id, message):  # TODO: Too complex
                                               - GRAPH_START_TIME).total_seconds() / 3600)
         with plotmemgraph(RAM_HISTORY, GRAPH_X_AXIS, tmperiod) as photo:
             bot.sendPhoto(chat_id, photo)
+    elif message == '/settings':
+        bot.send_message(chat_id,
+                         STRINGS['reply_settings'].format(memthreshold=RAM_THRESHOLD,
+                                                          alertupdate=ALERT_UPDATE_INTERVAL),
+                         reply_markup=MARKUP_SETTINGS,
+                         **DEFAULT_KWARGS)
 
 
 def alert_handle(bot):
