@@ -1,10 +1,10 @@
-# pylint: disable=broad-except,global-statement,invalid-name,missing-docstring,fixme
+# pylint: disable=broad-except,global-statement,invalid-name,missing-docstring,fixme,superfluous-parens
 
 from datetime import datetime
 from subprocess import Popen, PIPE, STDOUT
+from threading import Lock
+from collections import deque, Counter
 import os
-import operator
-import collections
 # import sys
 import time
 # import threading
@@ -84,7 +84,7 @@ STRINGS = {
     'graph_x': 'Last {:.2f} hours',
     'graph_y': '% Used',
     'graph_threshold': 'Threshold: {}%',
-    'stats_onilne_hours': 'Uptime is _{:.1f}_ Hours',
+    'stats_online_hours': 'Uptime is _{:.1f}_ Hours',
     'stats_memory_total': 'Total memory: _{:.2f} GB_',
     'stats_memory_available': 'Available memory: _{:.2f} GB_',
     'stats_memory_used': 'Used memory: _{}%_',
@@ -95,12 +95,12 @@ STRINGS = {
 ALERT_UPDATE_INTERVAL = 300  # seconds
 GRAPH_START_TIME = datetime.now()
 GRAPH_TEMP_FILE = 'graph.png'
-GRAPH_X_AXIS = []
+GRAPH_LOCK = Lock()
 LAST_SPAM_COMMAND = 0
 MENU_SETS_MEMTH = []
 MENU_SETS_POLLING = []
 MENU_SHELL = []
-RAM_HISTORY = []
+RAM_HISTORY = deque(maxlen=300)
 RAM_THRESHOLD = 85  # If memory usage more this %
 
 DEFAULT_KWARGS = {'parse_mode': ParseMode.MARKDOWN, 'disable_web_page_preview': True}
@@ -123,7 +123,7 @@ def clearall(chat_id):
         MENU_SETS_POLLING.remove(chat_id)
 
 
-def plotmemgraph(memlist, xaxis, tmperiod):
+def plotmemgraph(memlist, tmperiod):
     '''Draw an image of RAM usage.
 
     Return an opened file object which must be closed after.
@@ -132,21 +132,25 @@ def plotmemgraph(memlist, xaxis, tmperiod):
     '''
     # TODO: memory leak here!
     assert plt is not None, 'install matplotlib'
+    assert len(memlist) > 5, 'need more samples to make graph'
 
-    # print(memlist)
-    # print(xaxis)
-    plt.xlabel(tmperiod)
-    plt.ylabel(STRINGS['graph_y'])
-    plt.title(STRINGS['graph_title'])
-    plt.text(0.1 * len(xaxis),
-             RAM_THRESHOLD + 2,
-             STRINGS['graph_threshold'].format(RAM_THRESHOLD))
+    xaxis = [x * ALERT_UPDATE_INTERVAL / 60 for x in range(len(memlist), 0, -1)]
 
-    memthresholdarr = [RAM_THRESHOLD] * len(xaxis)
-    plt.plot(xaxis, memlist, 'b-', xaxis, memthresholdarr, 'r--')
-    plt.axis([0, len(xaxis) - 1, 0, 100])
-    plt.savefig(GRAPH_TEMP_FILE)
-    plt.close()
+    try:
+        plt.xlabel(tmperiod)
+        plt.ylabel(STRINGS['graph_y'])
+        plt.title(STRINGS['graph_title'])
+        plt.text(xaxis[3],
+                 RAM_THRESHOLD + 2,
+                 STRINGS['graph_threshold'].format(RAM_THRESHOLD))
+
+        plt.plot(xaxis, memlist, 'b-')  # , xaxis, memthresholdarr, 'r--')
+        plt.plot([RAM_THRESHOLD] * len(xaxis), 'r--')
+        plt.axis([len(xaxis), 1, 0, 100])
+        plt.savefig(GRAPH_TEMP_FILE)
+    finally:
+        plt.close()
+
     return open(GRAPH_TEMP_FILE, 'rb')  # some file on local disk
 
 
@@ -278,31 +282,25 @@ def command_handler(bot, upd, chat_id, message):  # TODO: Too complex
     # NOTE: Singleshot commands below
     elif message == '/stats' and psutil is not None:
         bot.send_chat_action(chat_id, ChatAction.TYPING)
+
         memory = psutil.virtual_memory()
         disk = psutil.disk_usage('/')
         boottime = datetime.fromtimestamp(psutil.boot_time())
         now = datetime.now()
-        timedif = STRINGS['stats_onilne_hours'].format(((now - boottime).total_seconds()) / 3600)
+        timedif = STRINGS['stats_online_hours'].format(((now - boottime).total_seconds()) / 3600)
         memtotal = STRINGS['stats_memory_total'].format(memory.total / 1000000000)
         memavail = STRINGS['stats_memory_available'].format(memory.available / 1000000000)
         memuseperc = STRINGS['stats_memory_used'].format(memory.percent)
         diskused = STRINGS['stats_disk_used'].format(disk.percent)
-        procs = {}
+        procs = Counter()
         for pid in psutil.pids():
             p = psutil.Process(pid)
             try:
-                pmem = p.memory_percent()
-                if pmem > 0.5:
-                    proc_name = p.name()
-                    if proc_name not in procs:
-                        procs[proc_name] = 0
-
-                    procs[proc_name] += pmem
+                procs[p.name()] += p.memory_percent()
             except Exception:
                 traceback.print_exc()
 
-        sortedprocs = sorted(procs.items(), key=operator.itemgetter(1), reverse=True)
-        pidsreply = '\n'.join("`%s` _%.2f%%_" % (proc[0], proc[1]) for proc in sortedprocs)
+        pidsreply = '\n'.join("`%s` _%.2f%%_" % (proc[0], proc[1]) for proc in procs.most_common(7))
         reply = '\n'.join((timedif,
                            memtotal,
                            memavail,
@@ -313,10 +311,11 @@ def command_handler(bot, upd, chat_id, message):  # TODO: Too complex
         bot.send_message(chat_id, reply.strip(), **DEFAULT_KWARGS)
     elif message == '/memgraph' and matplotlib is not None:
         bot.send_chat_action(chat_id, ChatAction.TYPING)
-        tmperiod = STRINGS['graph_x'].format((datetime.now()
-                                              - GRAPH_START_TIME).total_seconds() / 3600)
-        with plotmemgraph(RAM_HISTORY, GRAPH_X_AXIS, tmperiod) as photo:
-            bot.sendPhoto(chat_id, photo)
+        with GRAPH_LOCK:
+            tmperiod = STRINGS['graph_x'].format((datetime.now()
+                                                  - GRAPH_START_TIME).total_seconds() / 3600)
+            with plotmemgraph(RAM_HISTORY, tmperiod) as photo:
+                bot.sendPhoto(chat_id, photo)
     elif message == '/settings':
         bot.send_message(chat_id,
                          STRINGS['reply_settings'].format(memthreshold=RAM_THRESHOLD,
@@ -331,27 +330,10 @@ def alert_handle(bot):
     Need to keep the bot at running state
     '''
 
-    global RAM_HISTORY
-
     try:
         memck = psutil.virtual_memory()
         mempercent = memck.percent
-        if len(RAM_HISTORY) > 300:
-            memq = collections.deque(RAM_HISTORY)
-            memq.append(mempercent)
-            memq.popleft()
-
-            RAM_HISTORY = memq
-            RAM_HISTORY = list(RAM_HISTORY)  # FIXME: deep copy
-        else:
-            xaxis = None
-            try:
-                xaxis = GRAPH_X_AXIS[-1]
-            except LookupError:
-                xaxis = 0
-
-            GRAPH_X_AXIS.append(xaxis)
-            RAM_HISTORY.append(mempercent)
+        RAM_HISTORY.append(mempercent)
 
         if mempercent > RAM_THRESHOLD:
             memavail = STRINGS['stats_memory_available'].format(memck.available / 1000000000)
@@ -366,9 +348,10 @@ def alert_handle(bot):
                                  **DEFAULT_KWARGS)
 
             if matplotlib is not None:
-                with plotmemgraph(RAM_HISTORY, GRAPH_X_AXIS, tmperiod) as photo:
-                    for adminid in adminchatid:
-                        bot.send_photo(adminid, photo)
+                with GRAPH_LOCK:
+                    with plotmemgraph(RAM_HISTORY, tmperiod) as photo:
+                        for adminid in adminchatid:
+                            bot.send_photo(adminid, photo)
     except Exception:
         traceback.print_exc()
 
